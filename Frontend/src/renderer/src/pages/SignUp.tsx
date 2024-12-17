@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link } from 'react-router-dom'
 import { useSignup } from '@renderer/hooks/useAuth'
+import { Loader } from 'lucide-react'
 
 const schema = z
   .object({
@@ -26,7 +27,7 @@ function SignUp() {
   } = useForm<SignUpForm>({
     resolver: zodResolver(schema)
   })
-  const { mutate: signUp, error } = useSignup()
+  const { mutate: signUp, error, isPending } = useSignup()
 
   const onSubmit = async (data: SignUpForm) => {
     signUp({ fullname: data.name, email: data.email, password: data.password })
@@ -87,8 +88,11 @@ function SignUp() {
               <p className="text-red-500 text-sm">{errors.confirmPassword.message}</p>
             )}
           </div>
-          <button type="submit" className="w-full bg-gray-900 font-bold text-white py-2 rounded">
-            Sign Up
+          <button
+            type="submit"
+            className="w-full justify-center inline-flex bg-gray-900 text-white py-2 rounded"
+          >
+            {isPending ? <Loader className="animate-spin h-6 w-6 text-white" /> : 'Sign Up'}
           </button>
           {error?.response?.data?.message ? (
             <p className="text-red-500 text-sm">{error.response.data.message}</p>

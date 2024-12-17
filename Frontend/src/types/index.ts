@@ -1,24 +1,24 @@
 export interface User {
   id: string
-  name: string
+  fullname: string
   email: string
-  avatar?: string
-  status?: 'online' | 'offline'
-  lastSeen?: Date
 }
 
-export interface Message {
+export type Message = {
   id: string
-  senderId: string
-  receiverId: string
-  content: string
-  timestamp: Date
-  status: 'sent' | 'delivered' | 'read'
+  message: string
+  role: string
 }
 
-export interface Chat {
-  id: string
-  participants: User[]
-  lastMessage?: Message
-  unreadCount: number
+export type Chat = {
+  id: number
+  title: string
+  keywords: string[]
+  created_at: Date
+  last_message: Date
+}
+
+export type ChatsData = {
+  data: Chat[]
+  next: boolean
 }

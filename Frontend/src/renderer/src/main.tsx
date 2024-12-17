@@ -4,15 +4,15 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+dayjs.extend(relativeTime)
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      refetchOnMount: false,
-      retry: 1,
-      staleTime: 5 * 60 * 1000 // 5 minutes
+      retry: false
     }
   }
 })

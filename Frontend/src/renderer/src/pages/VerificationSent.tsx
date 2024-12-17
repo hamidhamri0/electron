@@ -1,16 +1,29 @@
-import { Mail } from 'lucide-react'
+import { Mail, ArrowLeft } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams, useNavigate } from 'react-router-dom'
 
 export default function VerificationSent() {
   const [searchParams] = useSearchParams()
   const email = searchParams.get('email')
+  const navigate = useNavigate()
+
   if (!email) {
     return <Navigate to="/signin" />
   }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="max-w-md w-full p-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate('/signin')}
+            className="flex items-center text-primary hover:underline"
+          >
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Back to Sign In
+          </button>
+        </div>
+
         <div className="flex flex-col items-center space-y-4 text-center">
           <div className="p-3 bg-primary/10 rounded-full">
             <Mail className="h-12 w-12 text-primary" />

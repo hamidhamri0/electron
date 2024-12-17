@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader } from 'lucide-react'
@@ -12,7 +12,7 @@ export default function VerificationEmail() {
   const token = searchParams.get('token')
   const navigate = useNavigate()
 
-  useMemo(() => {
+  useEffect(() => {
     if (token) {
       mutate(token)
     } else {
@@ -20,6 +20,8 @@ export default function VerificationEmail() {
     }
     return () => {}
   }, [token])
+
+  console.log(isLoading, error)
 
   return (
     <div className="flex items-center justify-center h-screen">

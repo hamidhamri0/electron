@@ -15,6 +15,7 @@ function App() {
       <Routes>
         <Route element={<ProtectedRoutes />}>
           <Route index element={<Home />} />
+          <Route path="c/:chatId" element={<Home />} />
         </Route>
         <Route element={<PublicOnlyRoutes />}>
           <Route path="/signin" element={<SignIn />} />

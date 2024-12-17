@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { sendEmailConfirmation } from "../services/emailService";
 import { supabase } from "../utils/supabaseClient";
+import { PostgrestResponse } from "@supabase/supabase-js";
 
 export type User = {
   id: string;
@@ -14,6 +15,10 @@ export type User = {
 
 export const signUp = async (req: Request, res: Response) => {
   const { email, password, fullname } = req.body;
+
+  if (!email || !password || !fullname) {
+    return res.status(400).json({ message: "Please fill in all fields." });
+  }
 
   // check if already exists
   const { data: userExists, error: errorExistingUser } = await supabase
@@ -102,11 +107,29 @@ export const confirmEmail = async (req: Request, res: Response) => {
 
     const { data, error } = await supabase
       .from("users")
-      .update({ email_confirmed: true })
-      .eq("id", decoded.id);
+      .select("email_confirmed")
+      .eq("id", decoded.id)
+      .single();
 
     if (error) {
       return res.status(400).json({ message: error.message });
+    }
+
+    if (data.email_confirmed) {
+      return res
+        .status(400)
+        .json({ message: "Email has already been confirmed." });
+    }
+
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ email_confirmed: true })
+      .eq("id", decoded.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(400).json({ message: updateError.message });
     }
 
     res.status(200).json({ message: "Email confirmed successfully." });
@@ -130,3 +153,5 @@ export const logout = async (req: Request, res: Response) => {
   res.clearCookie("refreshToken");
   res.status(200).json({ message: "Logout successful." });
 };
+
+

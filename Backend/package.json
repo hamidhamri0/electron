@@ -9,6 +9,7 @@
     "dev": "nodemon src/server.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "@supabase/supabase-js": "^2.47.7",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.5",

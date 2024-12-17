@@ -1,11 +1,27 @@
 import { Router } from "express";
-import { createChat, getChatsByUserId } from "../controllers/chatController";
 import { authMiddleware } from "../middlewares/authMiddleware";
+import {
+  createChat,
+  deleteChatById,
+  getChatsByUserId,
+  getMessagesByChatId,
+  sendMessage,
+  updateChatTitleById,
+} from "../controllers/chatController";
 
 const router = Router();
 
 // Route for creating a new chat
+router.post("/sendMessage", authMiddleware, sendMessage);
 router.post("/createChat", authMiddleware, createChat);
+
+router.get("/getMessagesByChatId", getMessagesByChatId);
+router.delete("/deleteChatById/:chatId", authMiddleware, deleteChatById);
+router.patch(
+  "/updateChatTitleById/:chatId",
+  authMiddleware,
+  updateChatTitleById
+);
 
 router.get("/getChatsByUserId", authMiddleware, getChatsByUserId);
 
