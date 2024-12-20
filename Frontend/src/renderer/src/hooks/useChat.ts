@@ -1,11 +1,14 @@
+import { streamReader } from '@/lib/stream'
 import { ChatsData, Message } from '@/src/types'
 import { chatApi } from '@renderer/axios/api'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 export const useStreamMessages = () => {
   const queryClient = useQueryClient()
+  const [, setSearchParams] = useSearchParams()
   return useMutation({
-    mutationFn: async ({ input, chatId }: { input: string; chatId: number }) => {
+    mutationFn: async ({ input, chatId }: { input: string; chatId: string }) => {
       const response = await fetch('http://localhost:5000/api/chat/sendMessage', {
         method: 'POST',
         headers: {
@@ -19,62 +22,67 @@ export const useStreamMessages = () => {
         throw new Error('ReadableStream not supported in this browser.')
       }
 
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let accumulatedMessage = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+      queryClient.setQueryData<Message[]>(['messages', chatId], (prev = []) => {
+        return [...prev, { id: crypto.randomUUID(), role: 'user', message: input }]
+      })
 
-        const chunk = decoder.decode(value, { stream: true })
-        accumulatedMessage += chunk
-        queryClient.setQueryData(['messages', chatId], (old: Message[] = []) => {
-          const lastMessage = old[old.length - 1]
+      try {
+        // Stream AI response
+        let isFirstChunk = true
+        for await (const chunk of streamReader(response)) {
+          queryClient.setQueryData<Message[]>(['messages', chatId], (prev = []) => {
+            prev
+            if (isFirstChunk) {
+              isFirstChunk = false
+              return [...prev, { id: crypto.randomUUID(), role: 'model', message: chunk }]
+            } else {
+              const messages = [...prev]
+              // Create a copy of the messages array
+              const updatedMessages = [...messages]
+              const lastMessage = { ...updatedMessages[updatedMessages.length - 1] } as Message
 
-          // If the last message is from AI, update it
-          if (lastMessage?.role === 'assistant') {
-            return [...old.slice(0, -1), { ...lastMessage, content: accumulatedMessage }]
-          }
+              // Update the last message
+              lastMessage.message += chunk
 
-          // Otherwise, add a new AI message
-          return [
-            ...old,
-            {
-              id: Date.now().toString(),
-              content: accumulatedMessage,
-              role: 'assistant'
+              // Replace the last message with the updated one
+              updatedMessages[updatedMessages.length - 1] = lastMessage
+
+              return updatedMessages
             }
-          ]
-        })
-        /*
-
-(prev) => {
-          const last = prev[prev.length - 1]
-          console.log(prev)
-          if (last?.role === 'user') {
-            return [...prev, { role: 'model', message: chunk }]
-          } else {
-            last.message += chunk
-            return [...prev.slice(0, prev.length - 1), last]
-          }
+          })
         }
-        */
+      } catch (err) {
+        console.error('Error reading stream:', err)
       }
+    },
+
+    onSuccess() {
+      setSearchParams((prev) => {
+        prev.delete('new')
+        return prev
+      })
     }
   })
 }
 
-export const useGetChats = ({ page, limit = 3 }: { page: number; limit?: number }) => {
+export const useGetChats = ({
+  searchQuery,
+  searchType
+}: {
+  searchQuery: string
+  searchType: string
+}) => {
   return useInfiniteQuery({
     queryKey: ['chats'],
-    queryFn: async ({ pageParam = page }) => {
+    queryFn: async ({ pageParam = 1 }) => {
       const { data } = await chatApi.get<ChatsData>(`/getChatsByUserId`, {
         params: {
           page: pageParam,
-          limit
+          limit: 3,
+          type: searchType,
+          search: searchQuery
         }
       })
-      console.log('HAHAHA', data)
       return data
     },
     getNextPageParam: (lastPage, allPages) => {
@@ -84,11 +92,12 @@ export const useGetChats = ({ page, limit = 3 }: { page: number; limit?: number 
       // Use allPages.length + 1 to determine next page number
       return allPages.length + 1
     },
-    initialPageParam: page
+    initialPageParam: 1
   })
 }
 export const useCreateChat = () => {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   return useMutation({
     mutationFn: async (title: string) => {
       const { data } = await chatApi.post(`/createChat`, {
@@ -96,7 +105,10 @@ export const useCreateChat = () => {
       })
       return data
     },
-    onSuccess: () => {
+    onSuccess: (chat) => {
+      const newChatId = chat.id
+      console.log('NAVIGATING')
+      navigate(`/c/${newChatId}?new=true`)
       queryClient.invalidateQueries({
         queryKey: ['chats']
       })
@@ -105,12 +117,11 @@ export const useCreateChat = () => {
 }
 
 export const useGetChatMessages = (
-  chatId: string,
+  chatId: string | undefined,
   page: number,
   limit: number,
   enabled: boolean
 ) => {
-  const queryClient = useQueryClient()
   return useQuery({
     initialData: [],
     enabled,
@@ -127,13 +138,10 @@ export const useGetChatMessages = (
           limit
         }
       })
-      // setMessages()
       const messages = data.data.map((message) => ({
         message: message.message,
         role: message.role
       }))
-      console.log(messages)
-      queryClient.setQueryData(['messages', chatId], messages)
       return messages
     }
   })

@@ -112,11 +112,11 @@ export const sendMessage = async (req: Request, res: Response) => {
     res.setHeader("Connection", "keep-alive");
     const result = await aiChat.sendMessageStream(message);
 
-    const aiResponse: string[] = [];
+    let aiResponse: string = "";
     for await (const chunk of result.stream) {
       const chunkText = chunk.text();
       res.write(`${chunkText}`);
-      aiResponse.push(chunkText);
+      aiResponse += chunkText;
     }
     // const aiResponse = result.response.text();
 
@@ -124,7 +124,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     const aiMessage = {
       chat_id: chat.id,
       role: "model",
-      message: aiResponse.join(" "),
+      message: aiResponse,
     };
 
     const { error: aiMessageError } = await supabase
@@ -149,34 +149,55 @@ export const sendMessage = async (req: Request, res: Response) => {
 export const getChatsByUserId = async (
   req: Request & {
     query: {
+      type: "title" | "keywords";
+      search: string;
       page: number;
       limit: number;
     };
   },
   res: Response
 ) => {
-  const { page, limit } = req.query;
+  const { page = 1, limit = 10, type, search } = req.query;
   const { user } = req;
   const userId = user?.id;
 
-  console.log(page, limit);
+  let query = supabase.from("chat").select("*").eq("user_id", userId);
 
-  const { data, error } = await supabase
-    .from("chat")
-    .select("*")
-    .eq("user_id", userId)
-    .order("last_message", {
-      ascending: false,
-    })
-    .range((page - 1) * limit, page * limit);
+  if (search && search.trim()) {
+    const trimmedSearch = search.trim();
+    if (type === "title") {
+      query = query.ilike("title", `%${trimmedSearch}%`);
+    } else if (type === "keywords") {
+      const keywords = trimmedSearch.split(/\s+/).filter(Boolean);
+
+      if (keywords.length > 0) {
+        query = query.contains("keywords", JSON.stringify(keywords));
+      } else {
+        return res.status(200).json({ data: [], next: false });
+      }
+    }
+  }
+
+  const start = (page - 1) * limit;
+  const end = start + limit;
+
+  console.log(start, end);
+
+  const { data, error } = await query
+    .range(start, end)
+    .order("last_message", { ascending: false });
 
   if (error) {
-    res.status(500).json({ error: error.message });
-    return;
+    console.error("Supabase Error:", error); // Log the full error for debugging
+    return res.status(500).json({ error: error.message });
+  }
+
+  if (!data) {
+    return res.status(200).json({ data: [], next: false });
   }
 
   const next = data.length > limit;
-  const paginatedData = data?.slice(0, data.length - 1);
+  const paginatedData = next ? data.slice(0, limit) : data;
 
   res.status(200).json({
     data: paginatedData,
@@ -251,7 +272,11 @@ export const createChat = async (req: Request, res: Response) => {
   );
   const chatTitle = titleResult.response.text();
   const newTitle = chatTitle.split("\n")[0].split(":")[1];
-  const keywordsExtracted = chatTitle.split("\n")[1].split(":")[1].split(",");
+  const keywordsExtracted = chatTitle
+    .split("\n")[1]
+    .split(":")[1]
+    .split(",")
+    .map((e) => e.trim());
 
   const { data, error } = await supabase
     .from("chat")

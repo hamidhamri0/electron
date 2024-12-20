@@ -5,6 +5,7 @@ import {
   confirmEmail,
   getUserInfo,
   logout,
+  refreshToken,
 } from "../controllers/authController";
 import { authMiddleware } from "../middlewares/authMiddleware";
 
@@ -15,6 +16,9 @@ router.post("/signup", signUp);
 
 // Login Route
 router.post("/login", login);
+
+// refresh
+router.get("/refreshToken", refreshToken);
 
 // Email Confirmation Route
 router.post("/confirm-email/:token", confirmEmail);

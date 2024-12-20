@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
+import { HashRouter as Router, Route, Routes } from 'react-router-dom'
 import Home from './pages/Home'
 import SignIn from '@renderer/pages/SignIn'
 import SignUp from '@renderer/pages/SignUp'
@@ -9,13 +9,13 @@ import VerificationSent from '@renderer/pages/VerificationSent'
 import VerificationEmail from '@renderer/pages/EmailVerification'
 
 function App() {
-  console.log('APP')
+  console.log('RENDERING APP', window.location.href)
   return (
     <Router>
       <Routes>
         <Route element={<ProtectedRoutes />}>
           <Route index element={<Home />} />
-          <Route path="c/:chatId" element={<Home />} />
+          <Route path="/c/:chatId" element={<Home />} />
         </Route>
         <Route element={<PublicOnlyRoutes />}>
           <Route path="/signin" element={<SignIn />} />

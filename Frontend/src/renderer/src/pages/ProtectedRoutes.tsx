@@ -5,6 +5,7 @@ import LoadingCenter from '@renderer/components/LoadingCenter'
 export default function ProtectedRoutes() {
   const { isLoading, isError, data: user } = useAuthStatus()
 
+  console.log('PROTECTED ROUTES', window.location.href)
   if (isLoading) {
     return <LoadingCenter />
   }

@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { sendEmailConfirmation } from "../services/emailService";
 import { supabase } from "../utils/supabaseClient";
 import { PostgrestResponse } from "@supabase/supabase-js";
+import exp from "constants";
 
 export type User = {
   id: string;
@@ -94,8 +95,14 @@ export const login = async (req: Request, res: Response) => {
     }
   );
 
-  res.cookie("refreshToken", refreshToken, { httpOnly: true });
-  res.cookie("token", token, { httpOnly: true });
+  const config = {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none" as const,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+  };
+  res.cookie("refreshToken", refreshToken, config);
+  res.cookie("token", token, config);
   res.status(200).json({ message: "Login successful." });
 };
 
@@ -154,4 +161,58 @@ export const logout = async (req: Request, res: Response) => {
   res.status(200).json({ message: "Logout successful." });
 };
 
+export const refreshToken = async (req: Request, res: Response) => {
+  const token = req.cookies.refreshToken;
 
+  console.log(token);
+
+  if (!token) {
+    return res.status(400).json({ message: "Invalid token." });
+  }
+
+  try {
+    const decoded: any = jwt.verify(token, "process.env.JWT_SECRET" as string);
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("email_confirmed")
+      .eq("id", decoded.id)
+      .single();
+
+    if (error) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (!data.email_confirmed) {
+      return res.status(400).json({ message: "Please confirm your email." });
+    }
+
+    const newToken = jwt.sign(
+      { id: decoded.id },
+      "process.env.JWT_SECRET" as string,
+      {
+        expiresIn: "1h",
+      }
+    );
+
+    const newRefreshToken = jwt.sign(
+      { id: decoded.id },
+      "process.env.JWT_SECRET" as string,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    const config = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none" as const,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    };
+    res.cookie("refreshToken", newRefreshToken, config);
+    res.cookie("token", newToken, config);
+    res.status(200).json({ message: "Token refreshed." });
+  } catch (error) {
+    res.status(400).json({ message: "Invalid or expired token." });
+  }
+};

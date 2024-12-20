@@ -9,45 +9,42 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Expand, FileArchiveIcon, ImageIcon, Loader2, Send } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import rehypeHighlight from 'rehype-highlight'
 
 export default function MainContent() {
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
   const { chatId } = useParams()
+  const [searchParams] = useSearchParams()
+  const enabled = searchParams.get('new')
+  const queryClient = useQueryClient()
+  const { isFullMode, toggleFullMode } = useFullModeStore((state) => state)
   const { mutateAsync: createChat } = useCreateChat()
   const { mutate: sendMessage } = useStreamMessages()
-  const { data: messages } = useGetChatMessages(chatId as string, 1, 10, !!chatId)
-  //   const { setMessages, messages } = useMessageStore((state) => state)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
-
-  const { isFetching: loadingMessages } = useGetChatMessages(
-    chatId as string,
+  const { data: messages, isFetching: loadingMessages } = useGetChatMessages(
+    chatId,
     1,
     10,
-    !!chatId && !messages.length
+    !!chatId && !enabled && !queryClient.getQueryData<Message[]>(['messages', chatId])?.length
   )
 
   const handleSubmit = async (input: string) => {
     // Add the user message to the UI immediately
     const newMessage: Message = { id: String(Date.now()), role: 'user', message: input }
     const newMessages = [...messages, newMessage]
-    queryClient.setQueryData(['messages', chatId], newMessages)
 
     try {
       if (!chatId) {
         const data = await createChat(input)
-        const newChatId = data.id
-        navigate(`/c/${newChatId}`)
-
+        const newChatId = String(data.id)
         sendMessage({
-          chatId: Number(newChatId),
+          chatId: newChatId,
           input
         })
       } else {
+        queryClient.setQueryData(['messages', chatId], newMessages)
         sendMessage({
-          chatId: Number(chatId),
+          chatId: chatId,
           input
         })
       }
@@ -62,17 +59,22 @@ export default function MainContent() {
     }
   }
 
-  const { isFullMode, toggleFullMode } = useFullModeStore((state) => state)
-
   useEffect(() => {
     if (scrollAreaRef.current) {
-      const scrollableArea = scrollAreaRef.current.querySelector(
-        '[data-radix-scroll-area-viewport]'
-      ) as HTMLElement
-      scrollableArea.scrollBy({
-        top: scrollableArea.scrollHeight,
-        behavior: 'smooth'
-      })
+      setTimeout(() => {
+        const scrollableArea = scrollAreaRef.current?.querySelector(
+          '[data-radix-scroll-area-viewport]'
+        ) as HTMLElement
+
+        if (scrollableArea) {
+          const scrollDistance = scrollableArea.scrollHeight - scrollableArea.clientHeight
+
+          scrollableArea.scrollBy({
+            top: scrollDistance,
+            behavior: 'smooth'
+          })
+        }
+      }, 200)
     }
   }, [messages, chatId])
 

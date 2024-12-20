@@ -7,7 +7,7 @@ export interface User {
 export type Message = {
   id: string
   message: string
-  role: string
+  role: 'user' | 'model'
 }
 
 export type Chat = {

@@ -1,5 +1,4 @@
-import React, { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useState } from 'react'
 import { MoreVertical, Share, Edit, Trash } from 'lucide-react'
 import {
   DropdownMenu,
@@ -11,69 +10,36 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useDeleteChat, useUpdateChatTitle } from '@renderer/hooks/useChat'
 import dayjs from 'dayjs'
 import { Chat } from '@/src/types'
-import { useQueryClient } from '@tanstack/react-query'
+import { useChatActions } from '@renderer/hooks/useChatActions'
+import { useParams } from 'react-router-dom'
 
 export default function EachChat({ chat }: { chat: Chat }) {
-  const queryClient = useQueryClient()
   const params = useParams()
   const chatId = Number(params.chatId)
-  const navigate = useNavigate()
+
   const [showAllKeywords, setShowAllKeywords] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editedTitle, setEditedTitle] = useState(chat.title)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
 
-  const { mutateAsync: deleteChat } = useDeleteChat()
-  const { mutate: updateChatTitle } = useUpdateChatTitle()
-
-  function handleSelectChat(e: React.MouseEvent) {
-    // Prevent navigation when clicking on the more options or editing title
-    if ((e.target as HTMLElement).closest('.more-options') || isEditing) {
-      e.stopPropagation()
-      return
-    }
-    queryClient.setQueryData(['messages', chatId], [])
-    navigate(`/c/${chat.id}`)
-  }
-
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    await deleteChat(chat.id)
-    navigate(`/`)
-    queryClient.setQueryData(['messages', chatId], [])
-  }
-
-  const handleEditSubmit = async (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      setIsEditing(false)
-      updateChatTitle({ chatId: chat.id, title: editedTitle })
-    }
-  }
-
-  const handleShare = async () => {}
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(`http://localhost:5173/c/${chat.id}`)
-  }
-
-  console.log(chat.last_message)
+  const { copyToClipboard, handleDelete, handleEditSubmit, handleSelectChat, handleShare } =
+    useChatActions(chat)
 
   return (
     <div
       className={`flex items-center mb-2 gap-3 p-3 hover:bg-gray-800 cursor-pointer ${
         chatId === chat.id ? 'bg-gray-700' : ''
       }`}
-      onClick={handleSelectChat}
+      onClick={(e) => handleSelectChat(e, isEditing)}
     >
       <div className="flex-1 min-w-0 overflow-hidden">
         {isEditing ? (
           <Input
             value={editedTitle}
             onChange={(e) => setEditedTitle(e.target.value)}
-            onKeyDown={handleEditSubmit}
+            onKeyDown={(e) => handleEditSubmit(e, editedTitle, setIsEditing)}
             onClick={(e) => e.stopPropagation()}
             className="mb-1"
             autoFocus
@@ -138,7 +104,11 @@ export default function EachChat({ chat }: { chat: Chat }) {
           </DialogHeader>
           <div className="flex flex-col gap-4">
             <div className="flex gap-2">
-              <Input readOnly value={`http://localhost:5173/c/${chat.id}`} className="flex-1" />
+              <Input
+                readOnly
+                defaultValue={`http://localhost:5173/c/${chat.id}`}
+                className="flex-1"
+              />
               <Button onClick={copyToClipboard}>Copy</Button>
             </div>
             <Button onClick={handleShare}>Create Link</Button>

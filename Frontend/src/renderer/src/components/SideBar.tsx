@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import {
   Select,
   SelectContent,
@@ -14,20 +14,21 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useGetChats } from '@renderer/hooks/useChat'
 import EachChat from '@renderer/components/EachChat'
 import { Chat } from '@/src/types'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useInView } from 'react-intersection-observer'
 import { useLogout } from '@renderer/hooks/useAuth'
 import useFullModeStore from '@renderer/store/fullModeStore'
+import useDebounce from '@renderer/hooks/useDebounce'
 import { useQueryClient } from '@tanstack/react-query'
 
 export default function SideBar() {
+  // Get search query and type from URL params
   const queryClient = useQueryClient()
-  const { chatId } = useParams()
+  const [searchParams, setSearchParam] = useSearchParams()
+  const searchQuery = searchParams.get('q') || ''
+  const searchType = (searchParams.get('type') as 'title' | 'keywords') || 'title'
   const { ref: loadMoreRef, inView } = useInView()
   const isFullMode = useFullModeStore((state) => state.isFullMode)
-  const [searchType, setSearchType] = useState<'title' | 'keywords' | 'date'>('title')
-  const [searchQuery, setSearchQuery] = useState('')
-
   const { mutate: logout } = useLogout()
   const navigate = useNavigate()
   const {
@@ -36,17 +37,17 @@ export default function SideBar() {
     hasNextPage,
     isFetchingNextPage
   } = useGetChats({
-    page: 1
+    searchQuery,
+    searchType
   })
+  const invalidateChatsDebounce = useDebounce(invalidateChats)
+  const allChats = chats?.pages.flatMap((page) => page.data.map((e) => e)) ?? ([] as Chat[])
 
-  const handleCreateChat = () => {
-    navigate('/')
-    queryClient.setQueryData(['messages', chatId], [])
-  }
+  // Create a function to update URL with search params
 
-  const handleSignOut = () => {
-    logout()
-  }
+  useEffect(() => {
+    invalidateChatsDebounce()
+  }, [searchQuery, searchType])
 
   useEffect(() => {
     if (inView && hasNextPage && !isFetchingNextPage) {
@@ -54,13 +55,34 @@ export default function SideBar() {
     }
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  const allChats = chats?.pages.flatMap((page) => page.data.map((e) => e)) ?? ([] as Chat[])
+  function invalidateChats() {
+    queryClient.invalidateQueries({
+      queryKey: ['chats']
+    })
+  }
+
+  const handleCreateChat = () => {
+    navigate('/')
+  }
+
+  const handleSignOut = () => {
+    logout()
+  }
+
+  const updateSearchParams = (newQuery: string, newType: 'title' | 'keywords') => {
+    setSearchParam((prev) => {
+      prev.set('q', newQuery)
+      prev.set('type', newType)
+      return prev
+    })
+  }
+
   return (
     <motion.div
       className={`border-r flex flex-col`}
-      initial={{ width: '20%' }}
+      initial={{ maxWidth: '350px' }}
       animate={{
-        width: isFullMode ? '0%' : '20%',
+        width: isFullMode ? '0%' : '350px',
         opacity: isFullMode ? 0 : 1,
         display: isFullMode ? 'none' : 'flex'
       }}
@@ -89,7 +111,9 @@ export default function SideBar() {
           <div className="flex flex-wrap space-x-2 gap-y-2">
             <Select
               value={searchType}
-              onValueChange={(value) => setSearchType(value as 'title' | 'keywords')}
+              onValueChange={(value) =>
+                updateSearchParams(searchQuery, value as 'title' | 'keywords')
+              }
             >
               <SelectTrigger className="w-[180px] bg-zinc-800 border-none text-white">
                 <SelectValue placeholder="Search by" />
@@ -102,13 +126,10 @@ export default function SideBar() {
             <Input
               placeholder={`Search by ${searchType}`}
               value={searchQuery}
-              // onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => updateSearchParams(e.target.value, searchType)}
               className="flex-1 bg-zinc-800 border-none text-white placeholder:text-zinc-400"
             />
           </div>
-          {searchType === 'date' && (
-            <p className="text-xs text-zinc-400">Enter date in YYYY-MM-DD format</p>
-          )}
         </div>
       </div>
       <ScrollArea className="flex-1">

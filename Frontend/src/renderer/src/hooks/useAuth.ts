@@ -15,7 +15,6 @@ export const useAuthStatus = () => {
   return useQuery({
     queryKey: ['authStatus'],
     queryFn: async () => {
-      console.log('RUN')
       const { data } = await authApi.get<User>('/me', {
         withCredentials: true // Important for sending cookies
       })
